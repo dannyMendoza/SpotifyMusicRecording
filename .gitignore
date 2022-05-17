@@ -1,3 +1,6 @@
 recording_venv/
 .credentials
 .cache
+.spotify_env_vars
+__pycache__/
+album_cover
