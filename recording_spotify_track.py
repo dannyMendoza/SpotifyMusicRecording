@@ -4,12 +4,12 @@
 # Robotics Engineer
 
 import argparse
+from pathlib import Path
+import time
 import subprocess as sp
 import sys
-import time
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials,SpotifyOAuth
-from pathlib import Path
 home = str(Path.home())
 
 
@@ -48,16 +48,33 @@ args = parser.parse_args()
 url = args.url
 option = args.option
 
+
+def is_playing():
+    try:
+        playing = spotify.currently_playing()['is_playing']
+        if playing:
+            return 1
+    except TypeError:
+        # This exception is thrown only in case spotify is active 
+        # but nothing has been played
+        return 2
+    return 0
+
+
 # Check if spotify is active
 def spotify_state():
     device_id = None
     devices = spotify.devices()['devices']
     for device in devices:
-        if device['is_active']:
+        if device['is_active'] or device['name'] == 'dannix':
             device_id = device['id']
+            if is_playing == 2:
+                spotify.start_playback(device_id)
+                time.sleep(1)
             print(f"\n    Active device: {device['name']}")
             break
     return device_id
+
 
 # Validate arguments and get playback data accordingly
 def get_song_by_url(url,option):
@@ -77,7 +94,7 @@ def get_song_by_url(url,option):
         url = url.rsplit('/')[-1].split('?')[0]
         results = spotify.track(url)
     else:
-        if not spotify_state():
+        if not device_id:
             sys.stderr.write(f"[ERROR] - Spotify is not running\n")
             sys.exit(3)
         results = spotify.current_user_playing_track()
@@ -90,18 +107,6 @@ def get_song_by_url(url,option):
             'Song': results['name'],
             }
     return track_dict
-
-
-result = get_song_by_url(url, option)
-
-if isinstance(result,tuple):
-    (Artist,Song) = result
-else:
-    SongURL = result['Preview Song URL']
-    AlbumCover = result['Album Cover']
-    Album = result['Album Name']
-    Artist = result['Artist']
-    Song = result['Song']
 
 
 # OUTPUT
@@ -162,6 +167,20 @@ def record():
     return recorded.communicate()
 
 
+is_playing = is_playing()
+device_id = spotify_state()
+result = get_song_by_url(url, option)
+
+if isinstance(result,tuple):
+    (Artist,Song) = result
+else:
+    SongURL = result['Preview Song URL']
+    AlbumCover = result['Album Cover']
+    Album = result['Album Name']
+    Artist = result['Artist']
+    Song = result['Song']
+
+
 def check():
     it_was_playing = False
     if args.url != 'playing':
@@ -169,7 +188,7 @@ def check():
             return 1
         print(print_to_terminal())
         for o in to_do:
-            if o == 'record' and spotify.currently_playing()['is_playing']:
+            if o == 'record' and is_playing:
                 spotify.pause_playback()
                 it_was_playing = True
                 # Modify time.sleep(1) secs if necessary, it depends on your 
@@ -190,7 +209,7 @@ if check():
         for o in to_do:
             if o == 'track':
                 continue
-            if o == 'record' and not spotify.currently_playing()['is_playing']:
+            if o == 'record' and not is_playing:
                 spotify.start_playback()
             eval(o + '()')
         print(f"    ⏺️  Song recorded successfully\n")
@@ -199,7 +218,6 @@ if check():
         eval(option + '()')
         print(f"    🖼️  Cover '{Album}' downloaded successfully!\n")
     elif (option == 'record'):
-        # cover()
         counter = 3
         while counter > 0:
             print(f"    Recording in {counter}")
@@ -209,7 +227,7 @@ if check():
         eval(option + '()')
         print(f"    ⏺️  Song recorded successfully\n")
     else:
-        if spotify.currently_playing()['is_playing']:
+        if is_playing:
             spotify.pause_playback()
         print(print_to_terminal())
         eval(option + '()')
