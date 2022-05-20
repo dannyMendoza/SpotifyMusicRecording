@@ -198,7 +198,7 @@ def check():
             eval(o + '()')
         if it_was_playing:
             spotify.start_playback()
-        print(f"    ⏺️  Song recorded successfully\n")
+        print(f"    ⏺️  Song successfully recorded\n")
         return 0
     return 1
 
