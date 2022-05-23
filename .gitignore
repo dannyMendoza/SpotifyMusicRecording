@@ -1,6 +1,9 @@
 recording_venv/
 .credentials
-.cache
+.cache*
 .spotify_env_vars
 __pycache__/
 album_cover
+*.mp4
+thumb.png
+.username

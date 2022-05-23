@@ -9,8 +9,13 @@ import time
 import subprocess as sp
 import sys
 import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials,SpotifyOAuth
-home = str(Path.home())
+#from spotipy.oauth2 import SpotifyClientCredentials,SpotifyOAuth
+import spotipy.util as util
+
+
+videos = str(Path.home()) + '/Videos/'
+script_path = str(Path(__file__).parent.absolute()) + '/'
+sp.run(f'rm -f {script_path}*.mp4',shell=True,stdout=sp.DEVNULL)
 
 
 scope = """
@@ -20,8 +25,11 @@ user-modify-playback-state
 """
 
 # Enable access to read and modify playback state
-spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
-#spotify = spotipy.Spotify(auth_manager=SpotifyClientCredentials())
+with open(f'{script_path}.username','r') as hidden:
+    username = hidden.readline().strip('\n')
+
+token = util.prompt_for_user_token(username, scope)
+spotify = spotipy.Spotify(token)
 
 to_do = ['cover','track','record']
 parser = argparse.ArgumentParser(
@@ -125,12 +133,12 @@ def print_to_terminal():
 def cover():
     cover_pic = sp.Popen(
             ['wget', '-4', AlbumCover,
-            '-O','album_cover','-q'
+            '-O',f'{script_path}album_cover','-q'
             ], stdout=sp.PIPE, stderr=sp.DEVNULL).communicate()[0]
     # Validate if the size of the album cover is 640x640
     # if the size is different it will be changed to 640x640
     image_size1 = sp.Popen(
-            ['file', 'album_cover'], stdout=sp.PIPE)
+            ['file', f'{script_path}album_cover'], stdout=sp.PIPE)
     image_size2 = sp.Popen(
             ["awk {'print $18'}"],
             shell=True, stdin=image_size1.stdout, stdout=sp.PIPE)
@@ -142,8 +150,8 @@ def cover():
     image = image_size3.communicate()[0]
     if image != '640x640':
         convert = sp.Popen(
-                ['convert', 'album_cover', 
-                    '-resize', '640x640!', 'album_cover'],
+                ['convert', '{script_path}album_cover', 
+                    '-resize', '640x640!', '{script_path}album_cover'],
                 stdout=sp.PIPE,
                 stderr=sp.DEVNULL)
         convert.communicate()[0]
@@ -159,12 +167,27 @@ def track():
 # Record ("30" secs) audio from your computer 
 def record():
     recorded = sp.Popen(
-            ['ffmpeg','-y','-framerate','1','-i','album_cover',
+            ['ffmpeg','-y','-framerate','1','-i',f'{script_path}album_cover',
             '-f','pulse','-i','default','-t','30','-vf','format=yuv420p',
-            f'{home}/Videos/API_{Artist}_{Song}.mp4'
+            f'{script_path}{Artist}_{Song}.mp4'
             ],stdout=sp.PIPE, stderr=sp.DEVNULL)
 
     return recorded.communicate()
+
+def add_thumbnail(video,image):
+    thumb = sp.Popen(
+            ['ffmpeg','-y','-i',video,'-vf',"thumbnail,scale=320:320",
+                '-frames:v','1',image,
+            ],stdout=sp.PIPE, stderr=sp.DEVNULL)
+    thumb.communicate()[0]
+
+    thumbnailed = sp.Popen(
+            ['ffmpeg','-y','-i',video,'-i',image,
+                '-map','1','-map','0','-c','copy','-disposition:0','attached_pic',
+                f'{videos}API_{Artist}_{Song}.mp4'
+            ],stdout=sp.PIPE, stderr=sp.DEVNULL)
+
+    return thumbnailed.communicate()
 
 
 is_playing = is_playing()
@@ -199,6 +222,7 @@ def check():
         if it_was_playing:
             spotify.start_playback()
         print(f"    ⏺️  Song successfully recorded\n")
+        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
         return 0
     return 1
 
@@ -213,6 +237,7 @@ if check():
                 spotify.start_playback()
             eval(o + '()')
         print(f"    ⏺️  Song recorded successfully\n")
+        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
     elif (option == 'cover'):
         print(print_to_terminal())
         eval(option + '()')
@@ -226,6 +251,7 @@ if check():
         print()
         eval(option + '()')
         print(f"    ⏺️  Song recorded successfully\n")
+        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
     else:
         if is_playing:
             spotify.pause_playback()
