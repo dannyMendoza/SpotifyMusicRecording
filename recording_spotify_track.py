@@ -150,8 +150,8 @@ def cover():
     image = image_size3.communicate()[0]
     if image != '640x640':
         convert = sp.Popen(
-                ['convert', '{script_path}album_cover', 
-                    '-resize', '640x640!', '{script_path}album_cover'],
+                ['convert', f'{script_path}album_cover', 
+                    '-resize', '640x640!', f'{script_path}album_cover'],
                 stdout=sp.PIPE,
                 stderr=sp.DEVNULL)
         convert.communicate()[0]
@@ -163,6 +163,15 @@ def track():
             ['xdg-open',SongURL],stdout=sp.PIPE, stderr=sp.DEVNULL)
     return track.communicate()
 
+# Check if the track already exists
+def mp4_exists(track):
+    counter = 0
+    track_exists = Path(track)
+    while track_exists.is_file():
+        counter += 1
+        track = f'{videos}API_{Artist}_{Song}_{counter}.mp4'
+        track_exists = Path(track)
+    return track
 
 # Record ("30" secs) audio from your computer 
 def record():
@@ -184,7 +193,7 @@ def add_thumbnail(video,image):
     thumbnailed = sp.Popen(
             ['ffmpeg','-y','-i',video,'-i',image,
                 '-map','1','-map','0','-c','copy','-disposition:0','attached_pic',
-                f'{videos}API_{Artist}_{Song}.mp4'
+                f'{track}'
             ],stdout=sp.PIPE, stderr=sp.DEVNULL)
 
     return thumbnailed.communicate()
@@ -203,6 +212,8 @@ else:
     Artist = result['Artist']
     Song = result['Song']
 
+track = f'{videos}API_{Artist}_{Song}.mp4'
+track = mp4_exists(track)
 
 def check():
     it_was_playing = False
