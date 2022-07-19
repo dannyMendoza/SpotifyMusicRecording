@@ -169,17 +169,18 @@ def mp4_exists(track):
     track_exists = Path(track)
     while track_exists.is_file():
         counter += 1
-        track = f'{videos}API_{Artist}_{Song}_{counter}.mp4'
+        track = f'{videos}API_{Artist}__{Song}_{counter}.mp4'
         track_exists = Path(track)
     return track
 
 # Record ("30" secs) audio from your computer 
 def record():
+    track_name = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
     recorded = sp.Popen(
             ['ffmpeg','-y','-framerate','1','-i',f'{script_path}album_cover',
             '-f','pulse','-i','default','-t','30','-vf','format=yuv420p',
-            f'{script_path}{Artist}_{Song}.mp4'
-            ],stdout=sp.PIPE, stderr=sp.DEVNULL)
+            track_name
+            ],stdout=sp.PIPE, stderr=sp.PIPE)
 
     return recorded.communicate()
 
@@ -212,7 +213,9 @@ else:
     Artist = result['Artist']
     Song = result['Song']
 
-track = f'{videos}API_{Artist}_{Song}.mp4'
+track = f'{videos}API_{Artist}__{Song.replace("/","-")}.mp4'
+thumbnail_track = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
+thumbnail_resized = f'{script_path}thumb.png'
 track = mp4_exists(track)
 
 def check():
@@ -233,7 +236,7 @@ def check():
         if it_was_playing:
             spotify.start_playback()
         print(f"    ⏺️  Song successfully recorded\n")
-        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
+        add_thumbnail(thumbnail_track,thumbnail_resized)
         return 0
     return 1
 
@@ -248,7 +251,7 @@ if check():
                 spotify.start_playback()
             eval(o + '()')
         print(f"    ⏺️  Song recorded successfully\n")
-        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
+        add_thumbnail(thumbnail_track,thumbnail_resized)
     elif (option == 'cover'):
         print(print_to_terminal())
         eval(option + '()')
@@ -259,14 +262,14 @@ if check():
             print(f"    Recording in {counter}")
             counter -= 1
             time.sleep(1)
-        print()
         eval(option + '()')
         print(f"    ⏺️  Song recorded successfully\n")
-        add_thumbnail(f'{script_path}{Artist}_{Song}.mp4',f'{script_path}thumb.png')
+        add_thumbnail(thumbnail_track,thumbnail_resized)
     else:
         if is_playing:
             spotify.pause_playback()
         print(print_to_terminal())
+        print(type(option))
         eval(option + '()')
         print(f"    🔊 I hope you enjoy '{Song}' track\n")
 
