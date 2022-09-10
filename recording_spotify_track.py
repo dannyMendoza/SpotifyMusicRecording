@@ -13,7 +13,7 @@ import spotipy
 import spotipy.util as util
 
 
-videos = str(Path.home()) + '/Videos/'
+videos = str(Path.home()) + '/MOVS/'
 script_path = str(Path(__file__).parent.absolute()) + '/'
 sp.run(f'rm -f {script_path}*.mp4',shell=True,stdout=sp.DEVNULL)
 
@@ -176,6 +176,7 @@ def mp4_exists(track):
 # Record ("30" secs) audio from your computer 
 def record():
     track_name = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
+    print(track_name)
     recorded = sp.Popen(
             ['ffmpeg','-y','-framerate','1','-i',f'{script_path}album_cover',
             '-f','pulse','-i','default','-t','30','-vf','format=yuv420p',
@@ -210,9 +211,10 @@ else:
     SongURL = result['Preview Song URL']
     AlbumCover = result['Album Cover']
     Album = result['Album Name']
-    Artist = result['Artist']
+    Artist = result['Artist'].replace("/","-")
     Song = result['Song']
 
+print(Artist)
 track = f'{videos}API_{Artist}__{Song.replace("/","-")}.mp4'
 thumbnail_track = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
 thumbnail_resized = f'{script_path}thumb.png'
