@@ -9,20 +9,19 @@ import time
 import subprocess as sp
 import sys
 import spotipy
-#from spotipy.oauth2 import SpotifyClientCredentials,SpotifyOAuth
 import spotipy.util as util
 
 
-videos = str(Path.home()) + '/MOVS/'
+videos = str(Path.home()) + '/MUSIC/'
 script_path = str(Path(__file__).parent.absolute()) + '/'
 sp.run(f'rm -f {script_path}*.mp4',shell=True,stdout=sp.DEVNULL)
 
 
-scope = """
+scope = '''
 user-read-playback-state,
 user-read-currently-playing,
 user-modify-playback-state
-"""
+'''
 
 # Enable access to read and modify playback state
 with open(f'{script_path}.username','r') as hidden:
@@ -214,11 +213,10 @@ else:
     Artist = result['Artist'].replace("/","-")
     Song = result['Song']
 
-print(Artist)
-track = f'{videos}API_{Artist}__{Song.replace("/","-")}.mp4'
+track_playing = f'{videos}API_{Artist}__{Song.replace("/","-")}.mp4'
 thumbnail_track = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
 thumbnail_resized = f'{script_path}thumb.png'
-track = mp4_exists(track)
+track_exists = mp4_exists(track_playing)
 
 def check():
     it_was_playing = False
@@ -271,7 +269,6 @@ if check():
         if is_playing:
             spotify.pause_playback()
         print(print_to_terminal())
-        print(type(option))
         eval(option + '()')
         print(f"    🔊 I hope you enjoy '{Song}' track\n")
 
