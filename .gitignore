@@ -5,5 +5,5 @@
 __pycache__/
 album_cover
 *.mp4
-thumb.png
+*.png
 .username

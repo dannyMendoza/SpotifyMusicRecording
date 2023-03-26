@@ -6,18 +6,18 @@ This python script records a 30 sec song from your computer and downloads the al
 You will need to create a developer app [Spotify Web API](https://developer.spotify.com/dashboard/) in order to access spotify related data.  
 <br/>
 Links:
-- https://spotipy.readthedocs.io/en/2.19.0/#
+- https://spotipy.readthedocs.io/en/2.22.1/
 - https://developer.spotify.com/dashboard/applications
 
 **Prerequisites:**
-- fmpeg version n5.0
-- Python 3.10.4
+- fmpeg version n6.0
+- Python 3.10+
 - GNU Wget 1.21.3
-- pulseaudio 15.0
+- pulseaudio 15.0 / pipewire 0.3.67
 - ImageMagick 7.0.8-11
 - requirements.txt - python packages
 ```code
-$ pip install -r requirements.txt
+$ pip install --upgrade -r requirements.txt
 ```
 
 **OS:**
@@ -35,7 +35,7 @@ Passing **Spotify URI** will open the preview_song on your default browser and w
 $ python recording_spotify_track.py --url <Spotify URI>
 ``` 
 
-Passing **Spotify URI** **+** option `'cover'` or `'track'` will ither download the album cover or open the preview_song.   
+Passing **Spotify URI** **+** option `'cover'` or `'track'` will either download the album cover or open the preview_song.   
 `-o {'cover','track'}, --option {'cover','track'}`  
 ```code
 $ python recording_spotify_track.py --url <Spotify URI> --option cover

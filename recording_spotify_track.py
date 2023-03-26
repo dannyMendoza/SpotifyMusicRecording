@@ -4,18 +4,27 @@
 # Robotics Engineer
 
 import argparse
-from pathlib import Path
 import time
+import os
+import re
 import subprocess as sp
 import sys
 import spotipy
-import spotipy.util as util
+import socket
+from pathlib import Path
 
 
-videos = str(Path.home()) + '/MUSIC/'
+videos = str(Path.home()) + '/Music/'
+pics = str(Path.home()) + '/Documents/GITREPOS/music.dmweb/images/'
 script_path = str(Path(__file__).parent.absolute()) + '/'
+file = str(Path.home()) + '/Documents/GITREPOS/music.dmweb/Melodies.txt'
 sp.run(f'rm -f {script_path}*.mp4',shell=True,stdout=sp.DEVNULL)
-
+sp.run(f'rm -f {script_path}*.png',shell=True,stdout=sp.DEVNULL)
+hostname = socket.gethostname()
+audio_sources = sp.Popen(['pactl','list','short','sources'],
+                         stdout=sp.PIPE,stderr=sp.PIPE,text=True
+                         ).communicate()[0].strip()
+audio_ouput = re.search(r'(?<=\s)alsa_output[^\s]+',audio_sources).group(0)
 
 scope = '''
 user-read-playback-state,
@@ -27,10 +36,10 @@ user-modify-playback-state
 with open(f'{script_path}.username','r') as hidden:
     username = hidden.readline().strip('\n')
 
-token = util.prompt_for_user_token(username, scope)
+token = spotipy.util.prompt_for_user_token(username, scope)
 spotify = spotipy.Spotify(token)
 
-to_do = ['cover','track','record']
+to_do = ['cover','track','record','mpqtile']
 parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=f'''
@@ -43,18 +52,19 @@ Short option description:
 [cover]           : Download cover album - "Spotify URI" required
 [track]           : Preview song - "Spotify URI" required
 [record]          : Record 30 secs from your computer audio
+[mscplayer]       : Personal consumed from musicplayer Qtile :)
         ''')
+
 parser.add_argument('-o', '--option', type=str, choices=to_do,
         default='playing', required=False,
         help='[option]')
 parser.add_argument('-u','--url', type=str, default='playing',
         help="[url]")
-parser.add_argument('-v', '--version', action='version', version='%(prog)s v1.1')
+parser.add_argument('-v', '--version', action='version', version='%(prog)s v1.2')
 
 args = parser.parse_args()
 url = args.url
 option = args.option
-
 
 def is_playing():
     try:
@@ -73,14 +83,31 @@ def spotify_state():
     device_id = None
     devices = spotify.devices()['devices']
     for device in devices:
-        if device['is_active'] or device['name'] == 'dannix':
+        device_type = device['type']
+        if device_type != 'Smartphone':
+            if args.option == 'mpqtile':
+                return f"{device['name']} {is_playing()}"
             device_id = device['id']
             if is_playing == 2:
                 spotify.start_playback(device_id)
                 time.sleep(1)
             print(f"\n    Active device: {device['name']}")
             break
+        else:
+            try:
+                if device['name'].startswith('Web'):
+                    device_id = device['id']
+                    spotify.start_playback(device_id)
+            except:
+                print('Spotify not active')
     return device_id
+
+# Only used from qtilescripts/musicplayer.py
+if args.option == 'mpqtile':
+    def mp():
+        print(spotify_state())
+    mp()
+    sys.exit()
 
 
 # Validate arguments and get playback data accordingly
@@ -102,16 +129,20 @@ def get_song_by_url(url,option):
         results = spotify.track(url)
     else:
         if not device_id:
-            sys.stderr.write(f"[ERROR] - Spotify is not running\n")
+            sys.stderr.write(f"[ERROR] - Spotify is not running in this device\n")
             sys.exit(3)
-        results = spotify.current_user_playing_track()
-        results = results['item']
+        while True:
+            results = spotify.current_user_playing_track()
+            if results:
+                results = results['item']
+                break
     track_dict = {
             'Preview Song URL': results['preview_url'],
             'Album Cover': results['album']['images'][0]['url'],
             'Album Name': results['album']['name'],
             'Artist': results['artists'][0]['name'],
             'Song': results['name'],
+            'URL': results['external_urls']['spotify']
             }
     return track_dict
 
@@ -123,6 +154,7 @@ def print_to_terminal():
         {'Album':<7}: {Album}
         {'Artist':<7}: {Artist}
         {'Song':<7}: {Song}
+        {'URL':<7}: {URL}
 
     """
     return data
@@ -168,55 +200,73 @@ def mp4_exists(track):
     track_exists = Path(track)
     while track_exists.is_file():
         counter += 1
-        track = f'{videos}API_{Artist}__{Song}_{counter}.mp4'
+        track = f'{videos}{Artist} : {Album} : {Song}_{counter}.mp4'
         track_exists = Path(track)
     return track
 
 # Record ("30" secs) audio from your computer 
 def record():
-    track_name = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
-    print(track_name)
     recorded = sp.Popen(
             ['ffmpeg','-y','-framerate','1','-i',f'{script_path}album_cover',
-            '-f','pulse','-i','default','-t','30','-vf','format=yuv420p',
-            track_name
-            ],stdout=sp.PIPE, stderr=sp.PIPE)
+             '-f','pulse','-i',audio_ouput,
+             '-metadata',f'artist={Artist}',
+             '-metadata',f'album={Album}',
+             '-metadata',f'title={Song}',
+             '-t','30','-vf','format=yuv420p',
+             '-af','afade=t=out:st=25:d=5',video_recorded],
+            stdout=sp.PIPE, stderr=sp.PIPE)
 
     return recorded.communicate()
 
 def add_thumbnail(video,image):
     thumb = sp.Popen(
-            ['ffmpeg','-y','-i',video,'-vf',"thumbnail,scale=320:320",
-                '-frames:v','1',image,
-            ],stdout=sp.PIPE, stderr=sp.DEVNULL)
+            ['ffmpeg','-y','-i',video,
+             '-vf',"thumbnail,scale=320:320",
+             '-frames:v','1',image,],
+            stdout=sp.PIPE,stderr=sp.DEVNULL)
     thumb.communicate()[0]
+
+    mv_to_pics = sp.Popen(
+            ['cp','-f',f'{image}',f'{pics}'],stdout=sp.PIPE, stderr=sp.DEVNULL)
+    mv_to_pics.communicate()[0]
 
     thumbnailed = sp.Popen(
             ['ffmpeg','-y','-i',video,'-i',image,
                 '-map','1','-map','0','-c','copy','-disposition:0','attached_pic',
-                f'{track}'
+                f'{track_output}'
             ],stdout=sp.PIPE, stderr=sp.DEVNULL)
 
     return thumbnailed.communicate()
 
 
+utf_fwdslasah = "\U00002044"
 is_playing = is_playing()
 device_id = spotify_state()
 result = get_song_by_url(url, option)
 
 if isinstance(result,tuple):
-    (Artist,Song) = result
+    (Artist,Song,Album) = result
 else:
     SongURL = result['Preview Song URL']
     AlbumCover = result['Album Cover']
-    Album = result['Album Name']
-    Artist = result['Artist'].replace("/","-")
-    Song = result['Song']
+    Album = result['Album Name'].replace("/",f"{utf_fwdslasah}")
+    Artist = result['Artist'].replace("/",f"{utf_fwdslasah}")
+    Song = result['Song'].replace("/",f"{utf_fwdslasah}")
+    URL = result['URL']
 
-track_playing = f'{videos}API_{Artist}__{Song.replace("/","-")}.mp4'
-thumbnail_track = f'{script_path}{Artist}__{Song.replace("/","-")}.mp4'
-thumbnail_resized = f'{script_path}thumb.png'
-track_exists = mp4_exists(track_playing)
+# txt file that enables records the URL
+def write_to_txt():
+    with open(file,'r+') as txt:
+        for line in txt.readlines():
+            if f'{Album} : {Song} : {URL}' in line:
+                return
+        txt.write(f'{Album} : {Song} : {URL}\n')
+write_to_txt()
+
+track_playing = f'{videos}{Artist} : {Album} : {Song}.mp4'
+video_recorded = f'{script_path}{Artist} : {Album} : {Song}.mp4'
+thumbnail_image = f'{script_path}{Album}.png'
+track_output = mp4_exists(track_playing)
 
 def check():
     it_was_playing = False
@@ -225,6 +275,8 @@ def check():
             return 1
         print(print_to_terminal())
         for o in to_do:
+            if o == 'mpqtile':
+                continue
             if o == 'record' and is_playing:
                 spotify.pause_playback()
                 it_was_playing = True
@@ -236,7 +288,7 @@ def check():
         if it_was_playing:
             spotify.start_playback()
         print(f"    ⏺️  Song successfully recorded\n")
-        add_thumbnail(thumbnail_track,thumbnail_resized)
+        add_thumbnail(video_recorded,thumbnail_image)
         return 0
     return 1
 
@@ -245,13 +297,13 @@ if check():
     if (option == 'playing'):
         print(print_to_terminal())
         for o in to_do:
-            if o == 'track':
+            if o == 'track' or o == 'mpqtile':
                 continue
             if o == 'record' and not is_playing:
                 spotify.start_playback()
             eval(o + '()')
         print(f"    ⏺️  Song recorded successfully\n")
-        add_thumbnail(thumbnail_track,thumbnail_resized)
+        add_thumbnail(video_recorded,thumbnail_image)
     elif (option == 'cover'):
         print(print_to_terminal())
         eval(option + '()')
@@ -264,12 +316,12 @@ if check():
             time.sleep(1)
         eval(option + '()')
         print(f"    ⏺️  Song recorded successfully\n")
-        add_thumbnail(thumbnail_track,thumbnail_resized)
+        add_thumbnail(video_recorded,thumbnail_image)
     else:
         if is_playing:
             spotify.pause_playback()
         print(print_to_terminal())
         eval(option + '()')
-        print(f"    🔊 I hope you enjoy '{Song}' track\n")
+        print(f"    🔊 I hope you enjoyed '{Song}' track\n")
 
 print(f"    Thanks for using this 🐍 script\n")
